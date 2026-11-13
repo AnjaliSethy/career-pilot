@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  USER
+}
+
+enum WorkArrangement {
+  REMOTE
+  HYBRID
+  ONSITE
+}
+
+enum ApplicationMode {
+  MANUAL
+  APPROVAL
+  HYBRID
+}
+
+enum ParseStatus {
+  PENDING
+  PARSED
+  FAILED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  role          Role      @default(OWNER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  profile            UserProfile?
+  resumes            Resume[]
+  refreshTokens      RefreshToken[]
+  jobPreference      JobPreference?
+  automationSettings AutomationSettings?
+  activityLogs       ActivityLog[]
+  aiUsageLogs        AiUsageLog[]
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserProfile {
+  id                 String           @id @default(cuid())
+  userId             String           @unique
+  fullName           String?
+  professionalEmail  String?
+  phone              String?
+  currentLocation    String?
+  preferredLocations String[]
+  workArrangements   WorkArrangement[]
+  currentTitle       String?
+  currentCompany     String?
+  yearsOfExperience  Float?
+  employmentStatus   String?
+  noticePeriod       String?
+  currentCompensation  String?
+  expectedCompensation String?
+  portfolioUrl       String?
+  githubUrl          String?
+  linkedinUrl        String?
+  careerObjective    String?
+  summary            String?
+  onboardingComplete Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  education      Education[]
+  experiences    Experience[]
+  skills         Skill[]
+  certifications Certification[]
+  projects       Project[]
+}
+
+model Education {
+  id          String      @id @default(cuid())
+  profileId   String
+  institution String
+  degree      String
+  field       String?
+  startYear   Int?
+  endYear     Int?
+  profile     UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model Experience {
+  id           String      @id @default(cuid())
+  profileId    String
+  company      String
+  title        String
+  location     String?
+  startDate    String?
+  endDate      String?
+  isCurrent    Boolean     @default(false)
+  description  String?
+  achievements String[]
+  profile      UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model Project {
+  id          String      @id @default(cuid())
+  profileId   String
+  name        String
+  description String?
+  url         String?
+  technologies String[]
+  profile     UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model Skill {
+  id        String      @id @default(cuid())
+  profileId String
+  name      String
+  category  String?
+  profile   UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, name])
+}
+
+model Certification {
+  id        String      @id @default(cuid())
+  profileId String
+  name      String
+  issuer    String?
+  year      Int?
+  profile   UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model Resume {
+  id             String      @id @default(cuid())
+  userId         String
+  label          String
+  originalName   String
+  storageKey     String      @unique
+  mimeType       String
+  sizeBytes      Int
+  sha256         String
+  isDefault      Boolean     @default(false)
+  extractedText  String?
+  parsedData     Json?
+  parseStatus    ParseStatus @default(PENDING)
+  parseError     String?
+  reviewedByUser Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sha256])
+  @@index([userId, isDefault])
+}
+
+model JobPreference {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  roleKeywords     String[]
+  excludedKeywords String[]
+  minMatchScore    Int      @default(70)
+  excellentScore   Int      @default(85)
+  goodScore        Int      @default(70)
+  reviewScore      Int      @default(55)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AutomationSettings {
+  id              String          @id @default(cuid())
+  userId          String          @unique
+  applicationMode ApplicationMode @default(HYBRID)
+  globalPaused    Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model AiUsageLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  purpose      String
+  model        String
+  inputTokens  Int?
+  outputTokens Int?
+  latencyMs    Int
+  success      Boolean
+  error        String?
+  createdAt    DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
